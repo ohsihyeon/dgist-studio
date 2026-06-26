@@ -440,7 +440,15 @@ body:not(.lobby-active) .lobby-screen {
   border-radius: 7px;
   color: #afbdd2;
   background: transparent;
-  font-size: 23px;
+}
+
+.icon-button::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
 }
 
 .icon-button:hover {
@@ -486,6 +494,7 @@ body:not(.lobby-active) .lobby-screen {
   border-radius: 8px;
   background: rgba(31, 111, 255, 0.16);
   color: #dce8ff;
+  font-size: 13px;
 }
 
 .shelf-button:hover {
@@ -519,21 +528,26 @@ body:not(.lobby-active) .lobby-screen {
 }
 
 .reset-button {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
   height: 34px;
   padding: 0 13px;
-  border: 1px solid rgba(175, 189, 210, 0.42);
+  border: 1px solid rgba(233, 85, 85, 0.32);
   border-radius: 8px;
-  background: transparent;
-  color: #d5deee;
+  background: rgba(255, 255, 255, 0.92);
+  color: #cf4d4d;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 8px 22px rgba(25, 42, 70, 0.12);
 }
 
 .reset-button:hover {
   border-color: rgba(233, 85, 85, 0.62);
-  background: rgba(233, 85, 85, 0.14);
-  color: #ffd7d7;
+  background: rgba(233, 85, 85, 0.1);
+  color: #c83f3f;
 }
 
 .app-shell {
@@ -551,7 +565,8 @@ body:not(.lobby-active) .lobby-screen {
 }
 
 .timetable-panel {
-  min-height: 642px;
+  min-height: 822px;
+  position: relative;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -559,7 +574,7 @@ body:not(.lobby-active) .lobby-screen {
 .calendar {
   display: grid;
   grid-template-columns: 56px repeat(5, minmax(120px, 1fr));
-  grid-template-rows: 40px repeat(18, 30px);
+  grid-template-rows: 40px repeat(24, 30px);
   position: relative;
   min-width: 740px;
 }
@@ -1177,6 +1192,13 @@ body:not(.lobby-active) .lobby-screen {
   border-radius: 7px;
   color: var(--text);
   outline: 0;
+}
+
+.shelf-save-row .primary-button,
+.shelf-save-row .secondary-button {
+  font-size: 13px;
+  padding-left: 18px;
+  padding-right: 18px;
 }
 
 .secondary-button {

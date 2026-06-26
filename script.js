@@ -1,7 +1,10 @@
 const days = ["월", "화", "수", "목", "금"];
-const colors = ["#1f6fff", "#16a085", "#e56b35", "#7a5cff", "#d9487d", "#008c95", "#6b7f14"];
+const categoryColors = {
+  기초필수: "#1f6fff",
+  심화필수: "#7a5cff",
+};
 const calendarStart = 9 * 60;
-const calendarEnd = 18 * 60;
+const calendarEnd = 21 * 60;
 const slotMinutes = 30;
 const rowHeight = 30;
 const storageKey = "timetable-chef-v3";
@@ -707,7 +710,7 @@ function renderBlocks() {
   state.placedIds
     .map(getSubject)
     .filter(Boolean)
-    .forEach((subject, index) => {
+    .forEach((subject) => {
       subject.sessions.forEach((session) => {
         const dayIndex = days.indexOf(session.day);
         const start = toMinutes(session.start);
@@ -722,7 +725,7 @@ function renderBlocks() {
         block.style.left = `${56 + dayIndex * width}px`;
         block.style.width = `${width}px`;
         block.style.height = `${Math.max(height - 8, 44)}px`;
-        block.style.background = colors[index % colors.length];
+        block.style.background = categoryColors[subject.category] || categoryColors["기초필수"];
         const sectionText = subject.sectionLabel ? ` · ${subject.sectionLabel}` : "";
         block.innerHTML = `
           <strong>${subject.name}</strong>
@@ -840,7 +843,7 @@ function placePending(id) {
   }
 
   if (!subject.sessions.every(isValidSession)) {
-    showToast(`${subject.displayName}은 09:00-18:00 시간표 범위를 벗어납니다.`, "error");
+    showToast(`${subject.displayName}은 09:00-21:00 시간표 범위를 벗어납니다.`, "error");
     return;
   }
 
