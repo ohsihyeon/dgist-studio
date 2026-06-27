@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DGIST STUDIO</title>
     <link rel="icon" type="image/png" href="studio-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=chef-labels" />
+    <link rel="stylesheet" href="styles.css?v=wizard-preview-colors-v1" />
   </head>
   <body class="lobby-active">
     <section class="lobby-screen" id="lobbyScreen" aria-label="DGIST STUDIO 로비">
@@ -44,21 +44,21 @@
       <div class="lobby-cards">
         <button class="lobby-card primary" id="enterWorkbenchBtn" type="button">
           <span class="lobby-card-icon workbench-grid" aria-hidden="true"></span>
-          <strong>시간표 요리사</strong>
+          <strong>시간표 작업대</strong>
           <span>이번 학기 시간표를 직접 배치하고 정리하세요.</span>
-          <em>요리 시작하기 →</em>
+          <em>작업 시작하기 →</em>
         </button>
 
-        <button class="lobby-card muted" type="button" aria-disabled="true">
+        <button class="lobby-card primary wizard-card" id="enterWizardBtn" type="button">
           <span class="lobby-card-icon mint wizard-icon" aria-hidden="true"></span>
           <strong>시간표 마법사</strong>
           <span>선택한 과목 조합으로 가능한 시간표를 자동으로 찾아보세요.</span>
-          <em>준비 중 →</em>
+          <em>마법 시작하기 →</em>
         </button>
 
         <button class="lobby-card muted" type="button" aria-disabled="true">
           <span class="lobby-card-icon purple graduation-icon" aria-hidden="true"></span>
-          <strong>졸업 요리사</strong>
+          <strong>졸업 작업대</strong>
           <span>졸업까지 남은 조건을 차분히 점검하세요.</span>
           <em>준비 중 →</em>
         </button>
@@ -67,14 +67,64 @@
       <footer class="lobby-footer">© 2026 DGIST STUDIO. All rights reserved.</footer>
     </section>
 
+    <section class="wizard-screen" id="wizardScreen" aria-label="시간표 마법사">
+      <header class="wizard-topbar">
+        <div class="brand">
+          <button class="icon-button" id="wizardBackBtn" type="button" aria-label="로비로 돌아가기"></button>
+          <h1>시간표 <span>마법사</span></h1>
+          <div class="active-timetable-badge wizard-badge" id="wizardSelectedCount">선택 0개</div>
+        </div>
+      </header>
+
+      <main class="wizard-shell">
+        <section class="wizard-picker" aria-label="마법사 과목 선택">
+          <div class="wizard-panel-header">
+            <div>
+              <strong>과목 고르기</strong>
+              <span>원하는 과목을 누르면 마법사가 분반 조합을 찾아줘요.</span>
+            </div>
+            <button class="secondary-button" id="wizardClearBtn" type="button">비우기</button>
+          </div>
+
+          <div class="search-wrap wizard-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="wizardSearchInput" type="search" placeholder="검색" />
+          </div>
+
+          <div class="wizard-subject-list" id="wizardSubjectList"></div>
+        </section>
+
+        <div class="wizard-resizer" id="wizardResizer" role="separator" aria-label="과목과 가능한 시간표 크기 조정" aria-orientation="vertical">
+          <span></span>
+        </div>
+
+        <section class="wizard-results-panel" aria-label="마법사 결과">
+          <div class="wizard-panel-header">
+            <div>
+              <strong>가능한 시간표</strong>
+              <span id="wizardResultCount">아직 만든 조합 없음</span>
+            </div>
+            <button class="primary-button wizard-generate" id="wizardGenerateBtn" type="button">자동 생성</button>
+          </div>
+
+          <div class="wizard-results" id="wizardResults"></div>
+
+          <div class="empty-state wizard-empty" id="wizardEmptyState">
+            <div aria-hidden="true">✦</div>
+            <p>과목을 선택하고 자동 생성을 눌러주세요</p>
+          </div>
+        </section>
+      </main>
+    </section>
+
     <header class="topbar">
       <div class="brand">
         <button class="icon-button" id="lobbyBackBtn" type="button" aria-label="로비로 돌아가기"></button>
-        <h1>시간표 <span>요리사</span></h1>
-        <div class="active-timetable-badge" id="activeTimetableBadge" title="현재 요리 중인 시간표">새 시간표</div>
+        <h1>시간표 <span>작업대</span></h1>
+        <div class="active-timetable-badge" id="activeTimetableBadge" title="현재 작업 중인 시간표">새 시간표</div>
       </div>
       <div class="toolbar">
-        <button class="shelf-button" id="shelfBtn" type="button">시간표 진열대</button>
+        <button class="shelf-button" id="shelfBtn" type="button">시간표 보관함</button>
         <div class="credit-pill" id="creditCount">0/21</div>
       </div>
     </header>
@@ -131,10 +181,10 @@
       <section class="shelf-modal" role="dialog" aria-modal="true" aria-labelledby="shelfTitle">
         <header class="shelf-header">
           <div>
-            <h2 id="shelfTitle">시간표 진열대</h2>
-            <p id="activeShelfLabel">현재 요리 중인 시간표 없음</p>
+            <h2 id="shelfTitle">시간표 보관함</h2>
+            <p id="activeShelfLabel">현재 작업 중인 시간표 없음</p>
           </div>
-          <button class="modal-close" id="closeShelfBtn" type="button" aria-label="시간표 진열대 닫기">×</button>
+          <button class="modal-close" id="closeShelfBtn" type="button" aria-label="시간표 보관함 닫기">×</button>
         </header>
 
         <div class="shelf-save-row">
@@ -152,6 +202,20 @@
       </section>
     </div>
 
+    <div class="modal-backdrop" id="wizardResultModal" aria-hidden="true">
+      <section class="shelf-modal wizard-result-modal" role="dialog" aria-modal="true" aria-labelledby="wizardResultModalTitle">
+        <header class="shelf-header">
+          <div>
+            <h2 id="wizardResultModalTitle">시간표 조합</h2>
+            <p id="wizardResultModalMeta">선택한 조합을 확인하세요</p>
+          </div>
+          <button class="modal-close" id="closeWizardResultBtn" type="button" aria-label="시간표 조합 닫기">×</button>
+        </header>
+
+        <div class="wizard-result-modal-body" id="wizardResultModalBody"></div>
+      </section>
+    </div>
+
     <template id="subjectTemplate">
       <article class="subject-card">
         <div class="subject-main">
@@ -164,6 +228,6 @@
       </article>
     </template>
 
-    <script src="script.js?v=dynamic-title"></script>
+    <script src="script.js?v=wizard-preview-colors-v1"></script>
   </body>
 </html>

@@ -3,6 +3,7 @@ const categoryColors = {
   기초필수: "#1f6fff",
   심화필수: "#7a5cff",
 };
+const previewColors = ["#5b8cff", "#76d7b8", "#ffd56b", "#ff9a8a", "#b69cff", "#8bd3ff", "#f3a6c8"];
 const calendarStart = 9 * 60;
 const calendarEnd = 21 * 60;
 const slotMinutes = 30;
@@ -11,6 +12,7 @@ const storageKey = "timetable-chef-v3";
 const shelfStorageKey = "timetable-chef-shelf-v1";
 const activeShelfStorageKey = "timetable-chef-active-shelf-v1";
 const layoutStorageKey = "timetable-chef-layout-original-v2";
+const wizardLayoutStorageKey = "timetable-chef-wizard-layout-v1";
 
 const state = {
   subjects: [],
@@ -20,6 +22,9 @@ const state = {
   activeShelfId: "",
   filter: "전체",
   expandedGroups: new Set(),
+  wizardSelectedIds: new Set(),
+  wizardResults: [],
+  wizardSelectedResultIndex: 0,
 };
 
 const calendar = document.querySelector("#calendar");
@@ -37,7 +42,24 @@ const dataInfo = document.querySelector("#dataInfo");
 const filterRow = document.querySelector("#filterRow");
 const toast = document.querySelector("#toast");
 const enterWorkbenchBtn = document.querySelector("#enterWorkbenchBtn");
+const enterWizardBtn = document.querySelector("#enterWizardBtn");
 const lobbyBackBtn = document.querySelector("#lobbyBackBtn");
+const wizardBackBtn = document.querySelector("#wizardBackBtn");
+const wizardSearchInput = document.querySelector("#wizardSearchInput");
+const wizardShell = document.querySelector(".wizard-shell");
+const wizardResizer = document.querySelector("#wizardResizer");
+const wizardSubjectList = document.querySelector("#wizardSubjectList");
+const wizardSelectedCount = document.querySelector("#wizardSelectedCount");
+const wizardResultCount = document.querySelector("#wizardResultCount");
+const wizardGenerateBtn = document.querySelector("#wizardGenerateBtn");
+const wizardClearBtn = document.querySelector("#wizardClearBtn");
+const wizardResults = document.querySelector("#wizardResults");
+const wizardEmptyState = document.querySelector("#wizardEmptyState");
+const wizardResultModal = document.querySelector("#wizardResultModal");
+const wizardResultModalTitle = document.querySelector("#wizardResultModalTitle");
+const wizardResultModalMeta = document.querySelector("#wizardResultModalMeta");
+const wizardResultModalBody = document.querySelector("#wizardResultModalBody");
+const closeWizardResultBtn = document.querySelector("#closeWizardResultBtn");
 const shelfBtn = document.querySelector("#shelfBtn");
 const shelfModal = document.querySelector("#shelfModal");
 const closeShelfBtn = document.querySelector("#closeShelfBtn");
@@ -403,6 +425,29 @@ function savePanelLayout(height) {
   localStorage.setItem(layoutStorageKey, String(height));
 }
 
+function getWizardWidthBounds() {
+  const shellWidth = wizardShell.getBoundingClientRect().width;
+  const min = 340;
+  const max = Math.max(min, shellWidth - 560);
+  return { min, max };
+}
+
+function setWizardPickerWidth(width) {
+  const { min, max } = getWizardWidthBounds();
+  const nextWidth = clamp(Math.round(width), min, max);
+  wizardShell.style.setProperty("--wizard-picker-width", `${nextWidth}px`);
+  return nextWidth;
+}
+
+function loadWizardLayout() {
+  const savedWidth = Number(localStorage.getItem(wizardLayoutStorageKey));
+  if (Number.isFinite(savedWidth) && savedWidth > 0) setWizardPickerWidth(savedWidth);
+}
+
+function saveWizardLayout(width) {
+  localStorage.setItem(wizardLayoutStorageKey, String(width));
+}
+
 function setupPanelResizer() {
   if (!panelResizer) return;
 
@@ -458,6 +503,54 @@ function setupPanelResizer() {
   });
   document.addEventListener("mousemove", (event) => moveResize(event.clientY));
   document.addEventListener("mouseup", finishResize);
+}
+
+function setupWizardResizer() {
+  if (!wizardResizer || !wizardShell) return;
+
+  let startX = 0;
+  let startWidth = 0;
+  let resizing = false;
+
+  function startResize(clientX) {
+    resizing = true;
+    startX = clientX;
+    startWidth = document.querySelector(".wizard-picker").getBoundingClientRect().width;
+    wizardShell.classList.add("resizing");
+  }
+
+  function moveResize(clientX) {
+    if (!resizing) return;
+    const nextWidth = setWizardPickerWidth(startWidth + (clientX - startX));
+    saveWizardLayout(nextWidth);
+  }
+
+  function finishResize() {
+    resizing = false;
+    wizardShell.classList.remove("resizing");
+  }
+
+  wizardResizer.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    startResize(event.clientX);
+    wizardResizer.setPointerCapture(event.pointerId);
+  });
+
+  wizardResizer.addEventListener("pointermove", (event) => {
+    moveResize(event.clientX);
+  });
+
+  function stopResize(event) {
+    if (!resizing) return;
+    finishResize();
+    if (wizardResizer.hasPointerCapture(event.pointerId)) wizardResizer.releasePointerCapture(event.pointerId);
+  }
+
+  wizardResizer.addEventListener("pointerup", stopResize);
+  wizardResizer.addEventListener("pointercancel", stopResize);
+  wizardResizer.addEventListener("lostpointercapture", finishResize);
+  document.addEventListener("pointerup", stopResize);
+  document.addEventListener("pointercancel", stopResize);
 }
 
 function getSubject(id) {
@@ -662,6 +755,53 @@ function groupSubjects(subjects) {
   return groups;
 }
 
+function groupAllSubjects() {
+  return groupSubjects(state.subjects);
+}
+
+function subjectCanBeScheduled(subject) {
+  return subject.sessions.length > 0 && subject.sessions.every(isValidSession);
+}
+
+function subjectsConflict(a, b) {
+  return a.sessions.some((session) => b.sessions.some((otherSession) => sessionsOverlap(session, otherSession)));
+}
+
+function getWizardSelectedGroups() {
+  const groupNames = [];
+  groupAllSubjects().forEach((group) => {
+    if (group.some((subject) => state.wizardSelectedIds.has(subject.id))) groupNames.push(group[0].groupName);
+  });
+  return groupNames;
+}
+
+function getWizardGroupOptions(groupName) {
+  return state.subjects.filter(
+    (subject) => subject.groupName === groupName && state.wizardSelectedIds.has(subject.id) && subjectCanBeScheduled(subject),
+  );
+}
+
+function toggleWizardSubject(subject) {
+  if (state.wizardSelectedIds.has(subject.id)) state.wizardSelectedIds.delete(subject.id);
+  else state.wizardSelectedIds.add(subject.id);
+  state.wizardResults = [];
+  state.wizardSelectedResultIndex = 0;
+  renderWizard();
+}
+
+function selectAllWizardGroup(group) {
+  const selectable = group.filter(subjectCanBeScheduled);
+  if (!selectable.length) return;
+  const allSelected = selectable.every((subject) => state.wizardSelectedIds.has(subject.id));
+  selectable.forEach((subject) => {
+    if (allSelected) state.wizardSelectedIds.delete(subject.id);
+    else state.wizardSelectedIds.add(subject.id);
+  });
+  state.wizardResults = [];
+  state.wizardSelectedResultIndex = 0;
+  renderWizard();
+}
+
 function isSectionedSubject(subject) {
   return subject.sectionNumber > 0;
 }
@@ -685,6 +825,292 @@ function renderSubjects() {
   });
 
   courseEmptyState.style.display = filtered.length === 0 ? "grid" : "none";
+}
+
+function renderWizardSubjects() {
+  const query = wizardSearchInput.value.trim().toLowerCase();
+  wizardSubjectList.replaceChildren();
+
+  groupAllSubjects()
+    .filter((group) => {
+      const text = group
+        .map((subject) => `${subject.name} ${subject.groupName} ${subject.professor} ${subject.area} ${subject.category}`)
+        .join(" ")
+        .toLowerCase();
+      return text.includes(query);
+    })
+    .forEach((group) => {
+      const representative = group[0];
+      const categories = [...new Set(group.map((subject) => subject.category).filter((item) => item && item !== "미정"))];
+      const areas = [...new Set(group.map((subject) => subject.area).filter((item) => item && item !== "미정"))];
+      const professors = [...new Set(group.map((subject) => subject.professor).filter((item) => item && item !== "미정"))];
+      const schedulableSubjects = group.filter(subjectCanBeScheduled);
+      const schedulableCount = schedulableSubjects.length;
+      const singleDirectSubject = group.length === 1 && schedulableSubjects.length === 1 ? schedulableSubjects[0] : null;
+      const selectedCount = group.filter((subject) => state.wizardSelectedIds.has(subject.id)).length;
+      const selected = selectedCount > 0;
+      const isExpanded = state.expandedGroups.has(`wizard:${representative.groupName}`);
+      const card = document.createElement("article");
+      const main = document.createElement("div");
+      const header = document.createElement("div");
+      const title = document.createElement("div");
+      const tags = document.createElement("div");
+      const meta = document.createElement("div");
+      const toggle = document.createElement("button");
+      const selectButton = document.createElement("button");
+      const sectionList = document.createElement("div");
+
+      card.className = `wizard-subject-card${selected ? " selected" : ""}`;
+      main.className = "wizard-subject-main";
+      header.className = "wizard-subject-header";
+      title.className = "wizard-subject-title";
+      tags.className = "subject-tags";
+      meta.className = "wizard-subject-meta";
+      toggle.className = "section-toggle wizard-section-toggle";
+      selectButton.className = "wizard-check";
+      sectionList.className = "wizard-section-list";
+
+      title.textContent = representative.groupName;
+      tags.innerHTML = [...categories, ...areas].slice(0, 3).map((tag) => `<span class="tag">${tag}</span>`).join("");
+      meta.textContent = singleDirectSubject
+        ? `${singleDirectSubject.professor} · ${singleDirectSubject.credits}학점 · ${formatSessions(singleDirectSubject)}`
+        : `${group.length}개 분반 · 배치 가능 ${schedulableCount}개 · 선택 ${selectedCount}개 · ${professors.slice(0, 2).join(", ")}${professors.length > 2 ? " 외" : ""}`;
+      toggle.type = "button";
+      toggle.setAttribute("aria-expanded", String(isExpanded));
+      toggle.textContent = isExpanded ? "접기" : `${group.length}개 분반`;
+      selectButton.type = "button";
+      selectButton.setAttribute(
+        "aria-label",
+        singleDirectSubject ? `${representative.groupName} 선택` : `${representative.groupName} 배치 가능한 분반 전체 선택`,
+      );
+      selectButton.textContent = "✓";
+
+      toggle.addEventListener("click", () => {
+        const key = `wizard:${representative.groupName}`;
+        if (state.expandedGroups.has(key)) state.expandedGroups.delete(key);
+        else state.expandedGroups.add(key);
+        renderWizard();
+      });
+
+      selectButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (singleDirectSubject) toggleWizardSubject(singleDirectSubject);
+        else selectAllWizardGroup(group);
+      });
+
+      header.append(title);
+      if (!singleDirectSubject) header.append(toggle);
+      main.append(header, tags, meta);
+      card.append(main, selectButton);
+
+      if (singleDirectSubject) {
+        card.classList.add("direct-select");
+        card.addEventListener("click", () => toggleWizardSubject(singleDirectSubject));
+      }
+
+      if (!singleDirectSubject && isExpanded) {
+        group.forEach((subject) => {
+          const row = document.createElement("button");
+          const rowMain = document.createElement("span");
+          const rowTitle = document.createElement("strong");
+          const rowMeta = document.createElement("span");
+          const rowCheck = document.createElement("i");
+          const canSchedule = subjectCanBeScheduled(subject);
+          const rowSelected = state.wizardSelectedIds.has(subject.id);
+
+          row.className = `wizard-section-row${rowSelected ? " selected" : ""}`;
+          row.type = "button";
+          row.disabled = !canSchedule;
+          rowMain.className = "wizard-section-main";
+          rowCheck.className = "wizard-section-check";
+          rowTitle.textContent = subject.sectionLabel || subject.displayName;
+          rowMeta.textContent = `${subject.professor} · ${subject.credits}학점 · ${formatSessions(subject)}`;
+          rowCheck.textContent = "✓";
+
+          row.addEventListener("click", () => toggleWizardSubject(subject));
+          rowMain.append(rowTitle, rowMeta);
+          row.append(rowMain, rowCheck);
+          sectionList.append(row);
+        });
+        card.append(sectionList);
+      }
+
+      wizardSubjectList.append(card);
+    });
+}
+
+function findWizardCombinations() {
+  const selectedGroups = getWizardSelectedGroups();
+  const orderedGroups = selectedGroups
+    .map((groupName, index) => ({
+      groupName,
+      index,
+      options: getWizardGroupOptions(groupName),
+    }))
+    .sort((a, b) => a.options.length - b.options.length);
+  const results = [];
+  const maxResults = 30;
+
+  if (!orderedGroups.length || orderedGroups.some((group) => group.options.length === 0)) return [];
+
+  function search(groupIndex, chosen) {
+    if (results.length >= maxResults) return;
+    if (groupIndex === orderedGroups.length) {
+      results.push(
+        [...chosen].sort((a, b) => selectedGroups.indexOf(a.groupName) - selectedGroups.indexOf(b.groupName)),
+      );
+      return;
+    }
+
+    orderedGroups[groupIndex].options.forEach((subject) => {
+      if (chosen.some((selected) => subjectsConflict(subject, selected))) return;
+      chosen.push(subject);
+      search(groupIndex + 1, chosen);
+      chosen.pop();
+    });
+  }
+
+  search(0, []);
+  return results;
+}
+
+function createWizardMiniTimetable(result, compact = false) {
+  const preview = document.createElement("div");
+  const dayRow = document.createElement("div");
+  const grid = document.createElement("div");
+
+  preview.className = `wizard-mini-timetable${compact ? " compact-preview" : ""}`;
+  dayRow.className = "wizard-mini-days";
+  grid.className = "wizard-mini-grid";
+
+  days.forEach((day) => {
+    const dayCell = document.createElement("span");
+    dayCell.textContent = day;
+    dayRow.append(dayCell);
+  });
+
+  result.forEach((subject, subjectIndex) => {
+    subject.sessions.forEach((session) => {
+      const dayIndex = days.indexOf(session.day);
+      const start = toMinutes(session.start);
+      const end = toMinutes(session.end);
+      if (dayIndex < 0 || start < calendarStart || end > calendarEnd) return;
+
+      const block = document.createElement("div");
+      const top = ((start - calendarStart) / (calendarEnd - calendarStart)) * 100;
+      const height = ((end - start) / (calendarEnd - calendarStart)) * 100;
+      const dayWidth = 100 / days.length;
+      const compactInset = compact ? 2 : 0;
+
+      block.className = "wizard-mini-block";
+      block.style.left = `${dayIndex * dayWidth + compactInset}%`;
+      block.style.top = `${top}%`;
+      block.style.width = `${dayWidth - compactInset * 2}%`;
+      block.style.height = `${Math.max(height, 7)}%`;
+      block.style.background = compact
+        ? previewColors[subjectIndex % previewColors.length]
+        : categoryColors[subject.category] || categoryColors["기초필수"];
+      block.style.setProperty("--mini-offset", `${subjectIndex % 3}px`);
+      block.title = `${subject.displayName} · ${session.day}${session.start}-${session.end}`;
+      block.textContent = compact ? "" : subject.groupName;
+      grid.append(block);
+    });
+  });
+
+  preview.append(dayRow, grid);
+  return preview;
+}
+
+function renderWizardResults() {
+  wizardResults.replaceChildren();
+
+  if (!state.wizardResults.length) {
+    wizardEmptyState.style.display = "grid";
+    wizardResultCount.textContent = state.wizardSelectedIds.size ? "가능한 조합 없음" : "아직 만든 조합 없음";
+    return;
+  }
+
+  wizardEmptyState.style.display = "none";
+  wizardResultCount.textContent = `${state.wizardResults.length}개 조합 발견`;
+  state.wizardSelectedResultIndex = clamp(state.wizardSelectedResultIndex, 0, state.wizardResults.length - 1);
+
+  const previewStrip = document.createElement("div");
+
+  previewStrip.className = "wizard-preview-strip";
+
+  state.wizardResults.forEach((result, index) => {
+    const previewCard = document.createElement("button");
+    const badge = document.createElement("span");
+
+    previewCard.className = `wizard-preview-card${index === state.wizardSelectedResultIndex ? " selected" : ""}`;
+    previewCard.type = "button";
+    previewCard.setAttribute("aria-label", `조합 ${index + 1} 확인`);
+    badge.className = "wizard-preview-badge";
+    badge.textContent = String(index + 1);
+    previewCard.append(badge, createWizardMiniTimetable(result, true));
+    previewCard.addEventListener("click", () => {
+      state.wizardSelectedResultIndex = index;
+      renderWizardResults();
+      openWizardResult(index);
+    });
+    previewStrip.append(previewCard);
+  });
+
+  wizardResults.append(previewStrip);
+}
+
+function renderWizardResultModal(index) {
+  const result = state.wizardResults[index];
+  if (!result) return;
+
+  const head = document.createElement("div");
+  const applyButton = document.createElement("button");
+  const list = document.createElement("div");
+  const miniTimetable = createWizardMiniTimetable(result);
+  const totalCredits = result.reduce((sum, subject) => sum + (Number(subject.credits) || 0), 0);
+
+  wizardResultModalBody.replaceChildren();
+  wizardResultModalTitle.textContent = `조합 ${index + 1}`;
+  wizardResultModalMeta.textContent = `${result.length}과목 · ${totalCredits}학점`;
+  head.className = "wizard-result-modal-actions";
+  applyButton.className = "wizard-apply-button";
+  list.className = "wizard-result-list";
+  applyButton.type = "button";
+  applyButton.textContent = "시간표에 적용";
+  applyButton.addEventListener("click", () => applyWizardResult(index));
+
+  result.forEach((subject) => {
+    const row = document.createElement("div");
+    const name = document.createElement("strong");
+    const time = document.createElement("span");
+
+    row.className = "wizard-result-row";
+    name.textContent = subject.displayName;
+    time.textContent = formatSessions(subject);
+    row.append(name, time);
+    list.append(row);
+  });
+
+  head.append(applyButton);
+  wizardResultModalBody.append(head, miniTimetable, list);
+}
+
+function openWizardResult(index) {
+  state.wizardSelectedResultIndex = index;
+  renderWizardResultModal(index);
+  wizardResultModal.classList.add("open");
+  wizardResultModal.setAttribute("aria-hidden", "false");
+}
+
+function closeWizardResult() {
+  wizardResultModal.classList.remove("open");
+  wizardResultModal.setAttribute("aria-hidden", "true");
+}
+
+function renderWizard() {
+  wizardSelectedCount.textContent = `선택 ${getWizardSelectedGroups().length}개`;
+  renderWizardSubjects();
+  renderWizardResults();
 }
 
 function renderPending() {
@@ -753,7 +1179,7 @@ function renderSummary() {
 
 function renderShelf() {
   const active = getActiveShelfItem();
-  activeShelfLabel.textContent = active ? `${active.name} 요리 중` : "현재 요리 중인 시간표 없음";
+  activeShelfLabel.textContent = active ? `${active.name} 작업 중` : "현재 작업 중인 시간표 없음";
   activeTimetableBadge.textContent = active ? active.name : "새 시간표";
   shelfNameInput.value = active ? active.name : "";
   shelfList.innerHTML = "";
@@ -780,7 +1206,7 @@ function renderShelf() {
     title.textContent = item.name;
     meta.textContent = `시간표 ${placedCount}개 · 대기 ${pendingCountValue}개 · ${formatSavedDate(item.updatedAt)}`;
     editButton.type = "button";
-    editButton.textContent = item.id === state.activeShelfId ? "요리 중" : "수정";
+    editButton.textContent = item.id === state.activeShelfId ? "작업 중" : "수정";
     deleteButton.type = "button";
     deleteButton.textContent = "삭제";
 
@@ -802,6 +1228,45 @@ function render() {
   renderBlocks();
   renderSummary();
   renderShelf();
+  renderWizard();
+}
+
+function generateWizardResults() {
+  if (state.wizardSelectedIds.size === 0) {
+    showToast("마법사에서 분반을 먼저 골라주세요.", "error");
+    return;
+  }
+
+  state.wizardResults = findWizardCombinations();
+  state.wizardSelectedResultIndex = 0;
+  renderWizard();
+
+  if (state.wizardResults.length) {
+    showToast(`가능한 시간표 ${state.wizardResults.length}개를 찾았습니다.`);
+  } else {
+    showToast("선택한 과목으로는 겹치지 않는 시간표를 찾지 못했습니다.", "error");
+  }
+}
+
+function clearWizardSelection() {
+  state.wizardSelectedIds.clear();
+  state.wizardResults = [];
+  state.wizardSelectedResultIndex = 0;
+  renderWizard();
+}
+
+function applyWizardResult(index) {
+  const result = state.wizardResults[index];
+  if (!result) return;
+
+  state.activeShelfId = "";
+  state.pendingIds = [];
+  state.placedIds = result.map((subject) => subject.id);
+  saveState();
+  saveShelf();
+  render();
+  enterWorkbench();
+  showToast(`마법사가 고른 ${result.length}과목을 시간표에 적용했습니다.`);
 }
 
 function moveToPending(id) {
@@ -907,7 +1372,7 @@ function saveCurrentToShelf() {
   saveShelf();
   saveState();
   render();
-  showToast("시간표 진열대에 저장했습니다.");
+  showToast("시간표 보관함에 저장했습니다.");
 }
 
 function createNewTimetable() {
@@ -948,18 +1413,33 @@ function deleteShelfItem(id) {
 }
 
 function enterWorkbench() {
+  document.body.classList.remove("wizard-active");
   document.body.classList.remove("lobby-active");
-  document.title = "시간표 요리사";
+  document.title = "시간표 작업대";
   renderBlocks();
+}
+
+function enterWizard() {
+  closeShelf();
+  closeWizardResult();
+  document.body.classList.remove("lobby-active");
+  document.body.classList.add("wizard-active");
+  document.title = "시간표 마법사";
+  loadWizardLayout();
+  renderWizard();
+  wizardSearchInput.focus();
 }
 
 function returnToLobby() {
   closeShelf();
+  closeWizardResult();
+  document.body.classList.remove("wizard-active");
   document.body.classList.add("lobby-active");
   document.title = "DGIST STUDIO";
 }
 
 searchInput.addEventListener("input", renderSubjects);
+wizardSearchInput.addEventListener("input", renderWizardSubjects);
 
 document.querySelector("#clearBtn").addEventListener("click", () => {
   state.pendingIds = [];
@@ -970,26 +1450,41 @@ document.querySelector("#clearBtn").addEventListener("click", () => {
 
 shelfBtn.addEventListener("click", openShelf);
 closeShelfBtn.addEventListener("click", closeShelf);
+closeWizardResultBtn.addEventListener("click", closeWizardResult);
 saveShelfBtn.addEventListener("click", saveCurrentToShelf);
 newTimetableBtn.addEventListener("click", createNewTimetable);
 enterWorkbenchBtn.addEventListener("click", enterWorkbench);
+enterWizardBtn.addEventListener("click", enterWizard);
 lobbyBackBtn.addEventListener("click", returnToLobby);
+wizardBackBtn.addEventListener("click", returnToLobby);
+wizardGenerateBtn.addEventListener("click", generateWizardResults);
+wizardClearBtn.addEventListener("click", clearWizardSelection);
 
 shelfModal.addEventListener("click", (event) => {
   if (event.target === shelfModal) closeShelf();
 });
 
+wizardResultModal.addEventListener("click", (event) => {
+  if (event.target === wizardResultModal) closeWizardResult();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && shelfModal.classList.contains("open")) closeShelf();
+  if (event.key === "Escape" && wizardResultModal.classList.contains("open")) closeWizardResult();
 });
 
 window.addEventListener("resize", () => {
   const currentHeight = pendingList.getBoundingClientRect().height;
   setPendingListHeight(currentHeight);
+  if (document.body.classList.contains("wizard-active")) {
+    const currentWidth = document.querySelector(".wizard-picker").getBoundingClientRect().width;
+    setWizardPickerWidth(currentWidth);
+  }
   renderBlocks();
 });
 
 setupPanelResizer();
+setupWizardResizer();
 loadPanelLayout();
 buildCalendar();
 loadCourses();
