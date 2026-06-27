@@ -753,7 +753,7 @@ function renderSummary() {
 
 function renderShelf() {
   const active = getActiveShelfItem();
-  activeShelfLabel.textContent = active ? `${active.name} 작업 중` : "현재 작업 중인 시간표 없음";
+  activeShelfLabel.textContent = active ? `${active.name} 요리 중` : "현재 요리 중인 시간표 없음";
   activeTimetableBadge.textContent = active ? active.name : "새 시간표";
   shelfNameInput.value = active ? active.name : "";
   shelfList.innerHTML = "";
@@ -780,7 +780,7 @@ function renderShelf() {
     title.textContent = item.name;
     meta.textContent = `시간표 ${placedCount}개 · 대기 ${pendingCountValue}개 · ${formatSavedDate(item.updatedAt)}`;
     editButton.type = "button";
-    editButton.textContent = item.id === state.activeShelfId ? "작업 중" : "수정";
+    editButton.textContent = item.id === state.activeShelfId ? "요리 중" : "수정";
     deleteButton.type = "button";
     deleteButton.textContent = "삭제";
 
@@ -907,7 +907,7 @@ function saveCurrentToShelf() {
   saveShelf();
   saveState();
   render();
-  showToast("시간표 보관함에 저장했습니다.");
+  showToast("시간표 진열대에 저장했습니다.");
 }
 
 function createNewTimetable() {
@@ -949,12 +949,14 @@ function deleteShelfItem(id) {
 
 function enterWorkbench() {
   document.body.classList.remove("lobby-active");
+  document.title = "시간표 요리사";
   renderBlocks();
 }
 
 function returnToLobby() {
   closeShelf();
   document.body.classList.add("lobby-active");
+  document.title = "DGIST STUDIO";
 }
 
 searchInput.addEventListener("input", renderSubjects);

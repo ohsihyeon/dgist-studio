@@ -520,7 +520,7 @@ body:not(.lobby-active) .lobby-screen {
 }
 
 .active-timetable-badge::before {
-  content: "작업중";
+  content: "요리중";
   margin-right: 7px;
   color: #8eb9ff;
   font-size: 11px;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DGIST STUDIO</title>
     <link rel="icon" type="image/png" href="studio-icon.png?v=2" />
-    <link rel="stylesheet" href="styles.css?v=category-colors" />
+    <link rel="stylesheet" href="styles.css?v=chef-labels" />
   </head>
   <body class="lobby-active">
     <section class="lobby-screen" id="lobbyScreen" aria-label="DGIST STUDIO 로비">
@@ -44,9 +44,9 @@
       <div class="lobby-cards">
         <button class="lobby-card primary" id="enterWorkbenchBtn" type="button">
           <span class="lobby-card-icon workbench-grid" aria-hidden="true"></span>
-          <strong>시간표 작업대</strong>
+          <strong>시간표 요리사</strong>
           <span>이번 학기 시간표를 직접 배치하고 정리하세요.</span>
-          <em>작업 시작하기 →</em>
+          <em>요리 시작하기 →</em>
         </button>
 
         <button class="lobby-card muted" type="button" aria-disabled="true">
@@ -58,7 +58,7 @@
 
         <button class="lobby-card muted" type="button" aria-disabled="true">
           <span class="lobby-card-icon purple graduation-icon" aria-hidden="true"></span>
-          <strong>졸업 작업대</strong>
+          <strong>졸업 요리사</strong>
           <span>졸업까지 남은 조건을 차분히 점검하세요.</span>
           <em>준비 중 →</em>
         </button>
@@ -70,11 +70,11 @@
     <header class="topbar">
       <div class="brand">
         <button class="icon-button" id="lobbyBackBtn" type="button" aria-label="로비로 돌아가기"></button>
-        <h1>시간표 <span>작업대</span></h1>
-        <div class="active-timetable-badge" id="activeTimetableBadge" title="현재 작업 중인 시간표">새 시간표</div>
+        <h1>시간표 <span>요리사</span></h1>
+        <div class="active-timetable-badge" id="activeTimetableBadge" title="현재 요리 중인 시간표">새 시간표</div>
       </div>
       <div class="toolbar">
-        <button class="shelf-button" id="shelfBtn" type="button">시간표 보관함</button>
+        <button class="shelf-button" id="shelfBtn" type="button">시간표 진열대</button>
         <div class="credit-pill" id="creditCount">0/21</div>
       </div>
     </header>
@@ -131,10 +131,10 @@
       <section class="shelf-modal" role="dialog" aria-modal="true" aria-labelledby="shelfTitle">
         <header class="shelf-header">
           <div>
-            <h2 id="shelfTitle">시간표 보관함</h2>
-            <p id="activeShelfLabel">현재 작업 중인 시간표 없음</p>
+            <h2 id="shelfTitle">시간표 진열대</h2>
+            <p id="activeShelfLabel">현재 요리 중인 시간표 없음</p>
           </div>
-          <button class="modal-close" id="closeShelfBtn" type="button" aria-label="시간표 보관함 닫기">×</button>
+          <button class="modal-close" id="closeShelfBtn" type="button" aria-label="시간표 진열대 닫기">×</button>
         </header>
 
         <div class="shelf-save-row">
@@ -164,6 +164,6 @@
       </article>
     </template>
 
-    <script src="script.js?v=category-colors"></script>
+    <script src="script.js?v=dynamic-title"></script>
   </body>
 </html>
