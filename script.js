@@ -740,6 +740,106 @@ function renderSubjectGroup(group) {
   return card;
 }
 
+function createPendingSectionActionButtons(subject) {
+  const actions = document.createElement("div");
+  const placeButton = document.createElement("button");
+  const removeButton = document.createElement("button");
+
+  actions.className = "card-actions";
+  placeButton.className = "add-button place-icon";
+  placeButton.type = "button";
+  placeButton.setAttribute("aria-label", "시간표에 배치");
+  placeButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    placePending(subject.id);
+  });
+
+  removeButton.className = "remove-pending-button remove-icon";
+  removeButton.type = "button";
+  removeButton.setAttribute("aria-label", "배치 대기중에서 빼기");
+  removeButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    removePending(subject.id);
+  });
+
+  actions.append(placeButton, removeButton);
+  return actions;
+}
+
+function renderPendingSectionRow(subject) {
+  const row = document.createElement("article");
+  const main = document.createElement("div");
+  const title = document.createElement("div");
+  const meta = document.createElement("div");
+  const time = document.createElement("div");
+
+  row.className = "section-row pending-section-row";
+  main.className = "section-main";
+  title.className = "section-title";
+  meta.className = "section-meta";
+  time.className = "section-time";
+
+  title.textContent = `${subject.sectionLabel || subject.displayName}${subject.isEnglishLecture ? " · 영어강의" : ""}`;
+  meta.textContent = `${subject.professor} · ${subject.credits}학점 · ${subject.room}`;
+  time.textContent = formatScheduleTimeOnly(subject);
+  row.addEventListener("click", () => placePending(subject.id));
+
+  main.append(title, meta, time);
+  row.append(main, createPendingSectionActionButtons(subject));
+  return row;
+}
+
+function renderPendingGroup(group) {
+  if (group.length === 1) return renderCard(group[0], "pending");
+
+  const representative = group[0];
+  const groupKey = `pending:${representative.groupName}`;
+  const isExpanded = state.expandedGroups.has(groupKey);
+  const card = document.createElement("article");
+  const main = document.createElement("div");
+  const header = document.createElement("div");
+  const title = document.createElement("div");
+  const tags = document.createElement("div");
+  const summary = document.createElement("div");
+  const toggle = document.createElement("button");
+  const sectionList = document.createElement("div");
+  const areas = [...new Set(group.map((subject) => subject.area).filter((item) => item && item !== "미정"))];
+  const categories = [...new Set(group.map((subject) => subject.category).filter((item) => item && item !== "미정"))];
+  const professors = [...new Set(group.map((subject) => subject.professor).filter((item) => item && item !== "미정"))];
+
+  card.className = `subject-card pending-card group-card${isExpanded ? " expanded" : ""}`;
+  main.className = "subject-main";
+  header.className = "group-header";
+  title.className = "subject-title";
+  tags.className = "subject-tags";
+  summary.className = "subject-meta";
+  toggle.className = "section-toggle";
+  toggle.type = "button";
+  toggle.setAttribute("aria-expanded", String(isExpanded));
+  toggle.textContent = isExpanded ? "접기" : `${group.length}개 분반`;
+  sectionList.className = "section-list";
+
+  title.textContent = representative.groupName;
+  tags.innerHTML = [...categories, ...areas].slice(0, 3).map((tag) => `<span class="tag">${tag}</span>`).join("");
+  summary.textContent = `${group.length}개 대기중 · ${professors.slice(0, 2).join(", ")}${professors.length > 2 ? " 외" : ""}`;
+  toggle.addEventListener("click", () => {
+    if (state.expandedGroups.has(groupKey)) state.expandedGroups.delete(groupKey);
+    else state.expandedGroups.add(groupKey);
+    renderPending();
+  });
+
+  header.append(title, toggle);
+  main.append(header, tags, summary);
+  card.append(main);
+
+  if (isExpanded) {
+    group.forEach((subject) => sectionList.append(renderPendingSectionRow(subject)));
+    card.append(sectionList);
+  }
+
+  return card;
+}
+
 function groupSubjects(subjects) {
   const groups = [];
   let current = null;
@@ -1122,8 +1222,8 @@ function renderPending() {
     pendingList.append(pendingEmptyState);
   } else {
     pendingEmptyState.style.display = "none";
-    pendingSubjects.forEach((subject) => {
-      pendingList.append(renderCard(subject, "pending"));
+    groupSubjects(pendingSubjects).forEach((group) => {
+      pendingList.append(renderPendingGroup(group));
     });
   }
 

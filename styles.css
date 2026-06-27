@@ -1428,6 +1428,15 @@ body:not(.lobby-active) .lobby-screen {
   background: #fbfdff;
 }
 
+.pending-section-row {
+  cursor: pointer;
+}
+
+.pending-section-row:hover {
+  border-color: #b8d1ff;
+  background: #f7fbff;
+}
+
 .section-main {
   min-width: 0;
 }
